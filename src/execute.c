@@ -2,6 +2,7 @@
  * execute.c
  *
  * Part 5: External command execution
+ * Part 6: I/O redirection is applied in the child (see redirect.c)
  *
  * Built-ins are handled before this is called. search_path() (path.c)
  * turns the command name into a full path, then we fork() and execv().
@@ -11,6 +12,7 @@
 
 #include "execute.h"
 #include "path.h"
+#include "redirect.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,11 +25,20 @@ int execute_external(tokenlist *tokens)
 	if (tokens == NULL || tokens->size == 0)
 		return -1;
 
+	/* 0. Pull "< file" / "> file" out of the tokens (Part 6), so only
+	 *    the command and its arguments are left for execv(). */
+	redirection redir;
+	if (parse_redirection(tokens, &redir) != 0) {
+		free_redirection(&redir);
+		return -1;
+	}
+
 	/* 1. Find the program in the parent, before forking, so a missing
 	 *    command is reported without creating a process. */
 	char *path = search_path(tokens->items[0]);
 	if (path == NULL) {
 		fprintf(stderr, "%s: command not found\n", tokens->items[0]);
+		free_redirection(&redir);
 		return -1;
 	}
 
@@ -36,6 +47,7 @@ int execute_external(tokenlist *tokens)
 	if (access(path, X_OK) != 0) {
 		perror(tokens->items[0]);
 		free(path);
+		free_redirection(&redir);
 		return -1;
 	}
 
@@ -48,12 +60,17 @@ int execute_external(tokenlist *tokens)
 	if (pid < 0) {
 		perror("fork");
 		free(path);
+		free_redirection(&redir);
 		return -1;
 	}
 
-	/* 3. Child: replace this process with the program. argv[0] stays
-	 *    as the user typed it ("ls"), like bash does. */
+	/* 3. Child: swap in the redirected stdin/stdout, then replace this
+	 *    process with the program. argv[0] stays as the user typed it
+	 *    ("ls"), like bash does. */
 	if (pid == 0) {
+		if (apply_redirection(&redir) != 0)
+			_exit(EXIT_FAILURE);
+
 		execv(path, tokens->items);
 
 		/* execv() only returns on failure. Exit right away, or the
@@ -68,5 +85,6 @@ int execute_external(tokenlist *tokens)
 		perror("waitpid");
 
 	free(path);
+	free_redirection(&redir);
 	return 0;
 }

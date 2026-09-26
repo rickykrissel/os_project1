@@ -1,3 +1,5 @@
+#include "execute.h"
+#include "expand.h"
 #include "lexer.h"
 #include "prompt.h"
 
@@ -17,7 +19,11 @@ int main(void)
 
 		tokenlist *tokens = get_tokens(input);
 
-		/* TODO: expansion, builtins and command execution go here */
+		expand_tokens(tokens);
+
+		/* TODO: builtins go here, before external commands */
+		if (tokens->size > 0)
+			execute_external(tokens);
 
 		free_tokens(tokens);
 		free(input);
