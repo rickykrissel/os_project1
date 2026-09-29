@@ -1,14 +1,5 @@
-/*
- * redirect.c
- *
- * Part 6: I/O redirection  (cmd < file_in > file_out)
- *
- * parse_redirection() runs in the shell before fork(); it pulls the
- * "<" / ">" tokens out of the command. apply_redirection() runs in the
- * child and swaps stdin/stdout for the files with dup2().
- */
 
-#define _POSIX_C_SOURCE 200809L   /* for fchmod() */
+#define _POSIX_C_SOURCE 200809L  
 
 #include "redirect.h"
 
@@ -19,17 +10,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* Output files are created as -rw------- (owner read/write only). */
+
 #define OUT_FILE_MODE (S_IRUSR | S_IWUSR)
 
-/* Returns 1 if token is one of the shell's operators. */
+// returns 1 if token is one of the shell operators
 static int is_operator_token(const char *token)
 {
-	return strcmp(token, "<") == 0 || strcmp(token, ">") == 0 ||
-	       strcmp(token, "|") == 0 || strcmp(token, "&") == 0;
+	return strcmp(token, "<") == 0 || strcmp(token, ">") == 0 || strcmp(token, "|") == 0 || strcmp(token, "&") == 0;
 }
 
-/* Signals an error if file does not exist or is not a regular file. */
 static int check_input_file(const char *file)
 {
 	struct stat st;
@@ -47,7 +36,8 @@ static int check_input_file(const char *file)
 
 int parse_redirection(tokenlist *tokens, redirection *redir)
 {
-	size_t kept = 0;   /* tokens that stay part of the command */
+	size_t kept = 0; 
+	
 	int status = 0;
 
 	redir->in_file = NULL;
@@ -63,27 +53,25 @@ int parse_redirection(tokenlist *tokens, redirection *redir)
 			continue;
 		}
 
-		/* "<" or ">" must be followed by a file name */
 		if (i + 1 >= tokens->size ||
 		    is_operator_token(tokens->items[i + 1])) {
-			if (status == 0)   /* report only the first error */
-				fprintf(stderr, "syntax error: missing file after '%s'\n",
+			if (status == 0)  
+				fprintf(stderr, "error: missing file after '%s'\n",
 					token);
 			status = -1;
 			free(token);
 			continue;
 		}
 
-		/* The operator token is dropped; the file name token is moved
-		 * into redir instead of being freed. */
 		char **target = is_in ? &redir->in_file : &redir->out_file;
 		free(*target);
+
 		*target = tokens->items[++i];
 		free(token);
 	}
 
 	tokens->size = kept;
-	tokens->items[kept] = NULL;   /* keep the list NULL-terminated for execv() */
+	tokens->items[kept] = NULL;  // keep the list NULL-terminated for execv()
 
 	if (status == 0 && kept == 0 &&
 	    (redir->in_file != NULL || redir->out_file != NULL)) {
@@ -91,7 +79,7 @@ int parse_redirection(tokenlist *tokens, redirection *redir)
 		status = -1;
 	}
 
-	/* The input file is dealt with first, before the command runs. */
+	// the input file is dealt with first, before the command runs.
 	if (status == 0 && redir->in_file != NULL)
 		status = check_input_file(redir->in_file);
 
@@ -100,7 +88,7 @@ int parse_redirection(tokenlist *tokens, redirection *redir)
 
 int apply_redirection(const redirection *redir)
 {
-	/* Input first: read-only, so the file can never be modified. */
+	// readonly so file cant be modified
 	if (redir->in_file != NULL) {
 		int fd = open(redir->in_file, O_RDONLY);
 		if (fd < 0) {
@@ -115,7 +103,7 @@ int apply_redirection(const redirection *redir)
 		close(fd);
 	}
 
-	/* Output: create if missing, overwrite (not append) if present. */
+		// create file if its missing, overwrite  if present
 	if (redir->out_file != NULL) {
 		int fd = open(redir->out_file, O_WRONLY | O_CREAT | O_TRUNC,
 			      OUT_FILE_MODE);
@@ -123,11 +111,10 @@ int apply_redirection(const redirection *redir)
 			perror(redir->out_file);
 			return -1;
 		}
-		/* O_CREAT's mode only applies to new files, so reset an
-		 * existing file's permissions to -rw------- as well. */
 		if (fchmod(fd, OUT_FILE_MODE) < 0 || dup2(fd, STDOUT_FILENO) < 0) {
 			perror("redirect");
 			close(fd);
+			
 			return -1;
 		}
 		close(fd);

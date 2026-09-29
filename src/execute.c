@@ -33,7 +33,7 @@ static void free_stages(command_stage *stages, size_t count)
 	}
 }
 
-/* Give each stage its own token list so redirection can remove its operands. */
+//Give each stage its own token list so operands can be removed 
 static tokenlist *copy_stage(const tokenlist *tokens, size_t first, size_t end)
 {
 	tokenlist *copy = calloc(1, sizeof *copy);
@@ -57,77 +57,112 @@ static tokenlist *copy_stage(const tokenlist *tokens, size_t first, size_t end)
 
 static int prepare_stage(command_stage *stage)
 {
-	if (parse_redirection(stage->tokens, &stage->redir) != 0)
+	const char *name;
+	struct stat info;
+
+	if (parse_redirection(stage->tokens, &stage->redir) != 0) {
 		return -1;
-	const char *name = stage->tokens->items[0];
+	}
+
+	name = stage->tokens->items[0];
 	stage->builtin = is_builtin(name);
-	if (stage->builtin)
+	if (stage->builtin) {
 		return 0;
+	}
+
 	stage->path = search_path(name);
-	if (stage->path == NULL) {
+	if (!stage->path) {
 		fprintf(stderr, "%s: command not found\n", name);
 		return -1;
 	}
-	struct stat st;
-	if (stat(stage->path, &st) != 0) {
+
+	if (stat(stage->path, &info) != 0) {
 		perror(name);
 		return -1;
 	}
-	if (!S_ISREG(st.st_mode)) {
+
+	if (!S_ISREG(info.st_mode)) {
 		fprintf(stderr, "%s: not a regular executable file\n", name);
 		return -1;
 	}
-	if (access(stage->path, X_OK) != 0) {
-		perror(name);
-		return -1;
+
+	if (access(stage->path, X_OK) == 0) {
+		return 0;
 	}
-	return 0;
+
+	perror(name);
+	return -1;
 }
 
-static int parse_pipeline(const tokenlist *tokens, command_stage *stages,
-			  size_t *count, int *background)
+static int parse_pipeline(const tokenlist *tokens, command_stage *stages, size_t *count, int *background)
 {
 	size_t end = tokens->size;
-	*background = strcmp(tokens->items[end - 1], "&") == 0;
-	if (*background)
+	size_t start = 0;
+	size_t i = 0;
+
+	if (strcmp(tokens->items[end - 1], "&") == 0) {
+		*background = 1;
 		end--;
-	size_t first = 0;
-	for (size_t i = 0; i <= end; i++) {
-		if (i < end && strcmp(tokens->items[i], "&") == 0) {
-			fprintf(stderr, "syntax error: '&' must end the command\n");
-			return -1;
-		}
-		if (i < end && strcmp(tokens->items[i], "|") != 0)
-			continue;
-		if (i == first) {
-			fprintf(stderr, "syntax error: missing pipeline command\n");
-			return -1;
-		}
-		if (*count == MAX_PIPELINE_COMMANDS) {
-			fprintf(stderr, "syntax error: at most two pipes are supported\n");
-			return -1;
-		}
-		command_stage *stage = &stages[(*count)++];
-		stage->tokens = copy_stage(tokens, first, i);
-		if (stage->tokens == NULL) {
-			perror("pipeline: allocation");
-			return -1;
-		}
-		if (prepare_stage(stage) != 0)
-			return -1;
-		first = i + 1;
+	} else {
+		*background = 0;
 	}
+
+	while (i <= end) {
+		int at_boundary = (i == end);
+
+		if (!at_boundary) {
+			const char *tok = tokens->items[i];
+
+			if (strcmp(tok, "&") == 0) {
+				fprintf(stderr, "syntax error: '&' must end the command\n");
+				return -1;
+			}
+			at_boundary = (strcmp(tok, "|") == 0);
+		}
+
+		if (at_boundary) {
+			command_stage *stage;
+
+			if (i == start) {
+				fprintf(stderr, "syntax error: missing pipeline command\n");
+				return -1;
+			}
+			if (*count == MAX_PIPELINE_COMMANDS) {
+				fprintf(stderr, "syntax error: at most two pipes are supported\n");
+				return -1;
+			}
+
+			stage = &stages[*count];
+			(*count)++;
+
+			stage->tokens = copy_stage(tokens, start, i);
+			if (stage->tokens == NULL) {
+				perror("pipeline: allocation");
+				return -1;
+			}
+			if (prepare_stage(stage) != 0) {
+				return -1;
+			}
+
+			start = i + 1;
+		}
+
+		i++;
+	}
+
 	return 0;
 }
 
-/* Parent built-ins must restore the shell's descriptors even on errors. */
+
 static command_result run_parent_builtin(command_stage *stage, shell_state *shell)
 {
 	if (stage->redir.in_file == NULL && stage->redir.out_file == NULL)
 		return execute_builtin(stage->tokens, shell, 0);
 	fflush(NULL);
+
 	int saved_in = dup(STDIN_FILENO);
 	int saved_out = dup(STDOUT_FILENO);
+
 	if (saved_in < 0 || saved_out < 0) {
 		perror("dup");
 		if (saved_in >= 0)
@@ -136,14 +171,20 @@ static command_result run_parent_builtin(command_stage *stage, shell_state *shel
 			close(saved_out);
 		return COMMAND_ERROR;
 	}
+
+
 	command_result result = COMMAND_ERROR;
+
 	if (apply_redirection(&stage->redir) == 0)
 		result = execute_builtin(stage->tokens, shell, 0);
+
 	fflush(NULL);
+	
 	if (dup2(saved_in, STDIN_FILENO) < 0)
 		perror("restore stdin");
 	if (dup2(saved_out, STDOUT_FILENO) < 0)
 		perror("restore stdout");
+
 	close(saved_in);
 	close(saved_out);
 	return result;
@@ -161,6 +202,7 @@ static void wait_children(const pid_t *pids, size_t count)
 {
 	for (size_t i = 0; i < count; i++) {
 		pid_t result;
+
 		do {
 			result = waitpid(pids[i], NULL, 0);
 		} while (result < 0 && errno == EINTR);
@@ -169,12 +211,22 @@ static void wait_children(const pid_t *pids, size_t count)
 	}
 }
 
-/* The close-on-exec pipe distinguishes launch failures from program exit codes. */
 static void child_failed(int error_fd)
 {
 	char failed = 1;
-	while (write(error_fd, &failed, 1) < 0 && errno == EINTR)
-		;
+
+	while (1) {
+		ssize_t result = write(error_fd, &failed, 1);
+
+		if (result >= 0) {
+			break;
+		}
+
+		if (errno != EINTR) {
+			break;
+		}
+	}
+
 	_exit(EXIT_FAILURE);
 }
 
@@ -186,7 +238,9 @@ static void run_child(command_stage *stages, size_t index, size_t count,
 		perror("pipeline: dup2");
 		child_failed(error_fd);
 	}
+
 	close_pipes(pipes, count - 1);
+
 	if (apply_redirection(&stages[index].redir) != 0)
 		child_failed(error_fd);
 	if (stages[index].builtin) {
@@ -196,12 +250,13 @@ static void run_child(command_stage *stages, size_t index, size_t count,
 			child_failed(error_fd);
 		_exit(EXIT_SUCCESS);
 	}
+
 	execv(stages[index].path, stages[index].tokens->items);
 	perror(stages[index].tokens->items[0]);
 	child_failed(error_fd);
 }
 
-/* Keep the original spelling of job commands, omitting the final '&'. */
+
 static char *job_command(const char *line)
 {
 	size_t length = strlen(line);
@@ -214,53 +269,52 @@ static char *job_command(const char *line)
 	return strndup(line, length);
 }
 
-static command_result launch_pipeline(command_stage *stages, size_t count,
-				      int background, const char *line, shell_state *shell)
+static command_result launch_pipeline(command_stage *stages, size_t count, int background, const char *line, shell_state *shell)
 {
 	char *command = NULL;
+	int pipes[MAX_PIPELINE_COMMANDS - 1][2];
+	int errors[2];
+	pid_t pids[MAX_PIPELINE_COMMANDS];
+	size_t pipe_count = 0;
+	size_t started = 0;
+	int failed;
+
 	if (background) {
 		if (!jobs_have_room(&shell->jobs)) {
 			fprintf(stderr, "background: at most ten jobs may run at once\n");
 			return COMMAND_ERROR;
 		}
+
 		command = job_command(line);
-		if (command == NULL) {
+		if (!command) {
 			perror("background: allocation");
 			return COMMAND_ERROR;
 		}
 	}
 
-	int pipes[MAX_PIPELINE_COMMANDS - 1][2];
-	size_t pipe_count = 0;
-	for (; pipe_count + 1 < count; pipe_count++) {
+	while (pipe_count + 1 < count) {
 		if (pipe(pipes[pipe_count]) != 0) {
 			perror("pipe");
-			close_pipes(pipes, pipe_count);
-			free(command);
-			return COMMAND_ERROR;
+			goto fail_pipes;
 		}
+		pipe_count++;
 	}
-	int errors[2];
+
 	if (pipe(errors) != 0) {
 		perror("pipe");
-		close_pipes(pipes, pipe_count);
-		free(command);
-		return COMMAND_ERROR;
+		goto fail_pipes;
 	}
+
 	if (fcntl(errors[1], F_SETFD, FD_CLOEXEC) < 0) {
 		perror("fcntl");
-		close(errors[0]);
-		close(errors[1]);
-		close_pipes(pipes, pipe_count);
-		free(command);
-		return COMMAND_ERROR;
+		goto fail_errors;
 	}
 
 	fflush(NULL);
-	pid_t pids[MAX_PIPELINE_COMMANDS];
-	size_t started = 0;
-	for (; started < count; started++) {
+
+	while (started < count) {
 		pid_t pid = fork();
+
 		if (pid < 0) {
 			perror("fork");
 			break;
@@ -269,39 +323,67 @@ static command_result launch_pipeline(command_stage *stages, size_t count,
 			close(errors[0]);
 			run_child(stages, started, count, pipes, errors[1], shell);
 		}
+
 		pids[started] = pid;
+		started++;
 	}
+
 	close_pipes(pipes, pipe_count);
 	close(errors[1]);
-	int failed = started != count;
+
+	failed = (started != count);
+
+	// every stage is forked before reading or waiting to avoid pipe deadlocks 
 	if (!failed) {
-		char error;
-		ssize_t bytes;
-		/* All stages are forked before reading or waiting, avoiding pipe deadlocks. */
-		while ((bytes = read(errors[0], &error, 1)) != 0) {
-			if (bytes < 0 && errno == EINTR)
-				continue;
-			failed = 1;
+		for (;;) {
+			char error;
+			ssize_t bytes = read(errors[0], &error, 1);
+
+			if (bytes == 0) {
+				break;
+			}
 			if (bytes < 0) {
+				if (errno == EINTR) {
+					continue;
+				}
+				failed = 1;
 				perror("startup: read");
 				break;
 			}
+
+			failed = 1;
 		}
 	}
+
 	close(errors[0]);
+
 	if (failed) {
-		/* A partially launched pipeline must not leave untracked children behind. */
-		for (size_t i = 0; i < started; i++)
+		size_t i = 0;
+
+		while (i < started) {
 			kill(pids[i], SIGTERM);
+			i++;
+		}
 		wait_children(pids, started);
 		free(command);
 		return COMMAND_ERROR;
 	}
-	if (background)
-		jobs_add(&shell->jobs, pids, count, command);
-	else
+
+	if (!background) {
 		wait_children(pids, count);
+		return COMMAND_OK;
+	}
+
+	jobs_add(&shell->jobs, pids, count, command);
 	return COMMAND_OK;
+
+fail_errors:
+	close(errors[0]);
+	close(errors[1]);
+fail_pipes:
+	close_pipes(pipes, pipe_count);
+	free(command);
+	return COMMAND_ERROR;
 }
 
 command_result execute_command(tokenlist *tokens, const char *line, shell_state *shell)
@@ -310,9 +392,13 @@ command_result execute_command(tokenlist *tokens, const char *line, shell_state 
 		return COMMAND_ERROR;
 	command_stage stages[MAX_PIPELINE_COMMANDS];
 	memset(stages, 0, sizeof stages);
+	
 	size_t count = 0;
 	int background = 0;
+
 	command_result result = COMMAND_ERROR;
+
+
 	if (parse_pipeline(tokens, stages, &count, &background) == 0) {
 		if (count == 1 && !background && stages[0].builtin)
 			result = run_parent_builtin(&stages[0], shell);

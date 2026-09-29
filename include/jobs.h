@@ -21,7 +21,7 @@ typedef struct {
 } job_table;
 
 int jobs_have_room(const job_table *jobs);
-/* Takes ownership of command. The caller checks capacity before forking. */
+//Takes ownership of command. The caller checks capacity before forking.
 void jobs_add(job_table *jobs, const pid_t *pids, size_t count, char *command);
 void jobs_poll(job_table *jobs);
 void jobs_print(const job_table *jobs);

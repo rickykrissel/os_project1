@@ -11,17 +11,19 @@
 int main(void)
 {
 	shell_state shell;
-	/* memset rather than {0}: older gcc (e.g. linprog) warns about missing braces. */
 	memset(&shell, 0, sizeof shell);
 	shell.jobs.next_number = 1;
-	/* Avoid reading future command lines into stdio's buffer before fork. */
+
 	setvbuf(stdin, NULL, _IONBF, 0);
+
 	for (;;) {
+
+
 		jobs_poll(&shell.jobs);
 		print_prompt();
 
 		char *input = get_input();
-		if (input == NULL) {   /* Ctrl+D: end of input */
+		if (input == NULL) {   
 			printf("\n");
 			shell_finish(&shell);
 			break;
@@ -31,8 +33,9 @@ int main(void)
 
 		expand_tokens(tokens);
 
-		/* Jobs may have finished while the shell was waiting for input. */
+		
 		jobs_poll(&shell.jobs);
+
 		command_result result = COMMAND_ERROR;
 		if (tokens->size > 0) {
 			result = execute_command(tokens, input, &shell);

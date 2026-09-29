@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 200809L   /* for strdup() */
+#define _POSIX_C_SOURCE 200809L   \
  
 #include "lexer.h"
  
@@ -8,7 +8,6 @@
  
 #define CHUNK_SIZE 64
  
-/* ---------- small allocation helpers ---------- */
  
 static void *xmalloc(size_t n)
 {
@@ -30,7 +29,6 @@ static void *xrealloc(void *old, size_t n)
 	return p;
 }
  
-/* ---------- reading input ---------- */
  
 char *get_input(void)
 {
@@ -41,8 +39,6 @@ char *get_input(void)
  
 	line[0] = '\0';
  
-	/* fgets reads at most CHUNK_SIZE - 1 chars at a time, so keep
-	 * appending chunks until we see the newline or hit EOF. */
 	while (fgets(chunk, sizeof chunk, stdin) != NULL) {
 		size_t n = strlen(chunk);
  
@@ -54,21 +50,19 @@ char *get_input(void)
 		len += n;
  
 		if (len > 0 && line[len - 1] == '\n') {
-			line[len - 1] = '\0';   /* strip the newline */
+			line[len - 1] = '\0';  
 			return line;
 		}
 	}
- 
-	/* EOF: return what we have, or NULL if nothing was typed */
-	if (len == 0) {
+ 	if (len == 0) {
 		free(line);
 		return NULL;
 	}
+
 	return line;
 }
- 
-/* ---------- token list ---------- */
- 
+  
+
 static tokenlist *new_tokenlist(void)
 {
 	tokenlist *tokens = xmalloc(sizeof *tokens);
@@ -80,10 +74,10 @@ static tokenlist *new_tokenlist(void)
  
 static void add_token(tokenlist *tokens, const char *item)
 {
-	/* room for the new token plus the terminating NULL */
 	tokens->items = xrealloc(tokens->items, (tokens->size + 2) * sizeof(char *));
  
 	tokens->items[tokens->size] = strdup(item);
+	
 	if (tokens->items[tokens->size] == NULL) {
 		perror("strdup");
 		exit(EXIT_FAILURE);
@@ -102,18 +96,13 @@ void free_tokens(tokenlist *tokens)
 	free(tokens);
 }
  
-/* ---------- tokenizing ---------- */
  
 static int is_operator(char c)
 {
 	return c == '<' || c == '>' || c == '|' || c == '&';
 }
  
-/*
- * Returns a copy of input with spaces around every operator, so that
- * strtok() will split them off: "ls>out&" becomes "ls > out & ".
- * Each character becomes at most 3, so 3 * len + 1 is always enough.
- */
+
 static char *pad_operators(const char *input)
 {
 	size_t len = strlen(input);
@@ -136,15 +125,10 @@ static char *pad_operators(const char *input)
 tokenlist *get_tokens(const char *input)
 {
 	tokenlist *tokens = new_tokenlist();
- 
-	/* strtok() modifies the string it scans, so work on a copy and
-	 * leave the caller's line intact (needed later for the jobs
-	 * command line and the exit history). */
 	char *buf = pad_operators(input);
  
-	/* same loop as tokenization.c, but splitting on tabs too and
-	 * saving each token instead of printing it */
 	char *tok = strtok(buf, " \t");
+	
 	while (tok != NULL) {
 		add_token(tokens, tok);
 		tok = strtok(NULL, " \t");

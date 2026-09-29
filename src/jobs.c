@@ -22,10 +22,12 @@ void jobs_add(job_table *jobs, const pid_t *pids, size_t count, char *command)
 		background_job *job = &jobs->entries[i];
 		if (job->count != 0)
 			continue;
+
 		job->number = jobs->next_number++;
 		job->count = count;
 		job->command = command;
 		job->last_pid = pids[count - 1];
+
 		for (size_t j = 0; j < count; j++)
 			job->pids[j] = pids[j];
 		printf("[%lu] %ld\n", job->number, (long)job->last_pid);
@@ -48,6 +50,8 @@ static void collect_jobs(job_table *jobs, int options)
 			do {
 				result = waitpid(job->pids[j], NULL, options);
 			} while (result < 0 && errno == EINTR);
+
+
 			if (result > 0 || (result < 0 && errno == ECHILD))
 				job->pids[j] = 0;
 			else {
@@ -58,7 +62,9 @@ static void collect_jobs(job_table *jobs, int options)
 		}
 		if (!running) {
 			printf("[%lu] + done %s\n", job->number, job->command);
+
 			free(job->command);
+			
 			job->command = NULL;
 			job->count = 0;
 		}

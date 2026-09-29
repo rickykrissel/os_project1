@@ -1,74 +1,117 @@
-# Operating Systems Project 1
+Team Members: Ricky Krissel, Elias Elradi, Zechariah Zhong
 
-Build and run on a POSIX system (Linux or macOS) with a C99 compiler:
+Division of Labor:
+Part 1: Prompt
+- Ricky and Zechariah
+
+
+Part 2: Environment Variables
+- Ricky and Elias
+
+
+Part 3: Tilde Expansion
+- Elias and Zechariah
+
+
+Part 4: $PATH Search
+- Ricky and Elias
+
+
+Part 5: External Command Execution
+- Zechariah and Elias
+
+
+Part 6: I/O Redirection
+- Ricky and Zechariah
+
+
+Part 7: Piping
+- Zechariah and Elias
+
+
+Part 8: Background Processing
+- Ricky and Elias
+
+
+Part 9: Internal Command Execution
+- Ricky and Zechariah
+
+
+Extra Credit
+- Ricky, Elias, and Zechariah
+
+## Use of AI
+Used AI to set up general structure of files like the suggested one from the syllabus, fix errors, and clean up code
+
+## File listing
+
+- Makefile: builds the shell
+
+- .gitignore: keeps the generated bin and obj directories out of Git.
+
+- `src/main.c`: main loop that prints the prompt, reads input, polls background
+  jobs, runs commands, and records history.
+- `src/lexer.c`, `include/lexer.h`: reads a line of input and splits it into tokens.
+- `src/prompt.c`, `include/prompt.h`: prints the `USER@MACHINE:PWD>` prompt.
+- `src/expand.c`, `include/expand.h`: environment variable (`$VAR`) and tilde
+  (`~`, `~/dir`) expansion.
+- `src/path.c`, `include/path.h`: searches `$PATH` for an executable.
+- `src/redirect.c`, `include/redirect.h`: parses `<` and `>` and sets up the file
+  descriptors in the child.
+- `src/execute.c`, `include/execute.h`: parses pipelines and `&`, then forks, pipes,
+  and executes each command.
+- `src/jobs.c`, `include/jobs.h`: tracks background jobs and reports when they finish.
+- `src/builtins.c`, `include/builtins.h`: the `cd`, `jobs`, and `exit` built-ins,
+  plus command history.
+- `include/shell.h`: shared shell state (job table and history) and command result codes.
+
+```sh
+
+# How to compile
+
+On linprog, or any Linux system with `gcc` and `make`, run this from the
+repository root:
 
 ```sh
 make
 ./bin/shell
+make            # builds bin/shell
+./bin/shell     # runs the shell
+make clean      # removes bin/ and obj/
 ```
 
-The executable is generated in `bin/`; generated binaries and object files are
-ignored by Git. `make clean` removes build output. `make test` runs the integration
-tests using Python 3.6+ and its standard library (override the interpreter with `make test PYTHON=...`); Python is not needed to build or run the shell.
 
-## Supported commands
+## Development log
+Zechariah - I added in  parts 7 8 9. I added pipelines supporting 2 pipes. Background jobs with IDs, PID reporting, and completion tracking. 
+I also added the commands cd, jobs, and exit, and it includes history and wiaitng for background processess. 
 
-The shell expands whole-argument environment variables and `~`/`~/`, searches
-`$PATH`, and executes programs with `fork()` and `execv()`.
+Ricky - Set up github and files, completed parts 2 and 4, assisted with development on parts 8 and 9
 
-Parts 7-9 add:
+Elias - Contributed to parts 1,3,5 and 6. 
 
-- Up to two pipes (three concurrent commands), for example
-  `cat input.txt | sort | wc -l`. Unused pipe descriptors are closed in every
-  process, and foreground execution waits for all pipeline stages.
-- Background execution with a trailing `&`, including pipelines and redirection:
-  `sleep 2 &`, `cat input.txt | sort &`, and `cat < input.txt > output.txt &`.
-  Start messages use `[number] PID`; the PID is that of the last pipeline stage.
-  Completion messages use `[number] + done command`. A pipeline completes only
-  when every stage finishes. Job numbers start at 1 and are never reused; up to
-  ten jobs are tracked at once. Completion is checked in the main loop, so a
-  notification can be delayed while the shell waits for input or a foreground command.
-- `cd [PATH]` changes the shell's directory, defaults to `$HOME`, and updates
-  `$PWD`. Extra arguments, nonexistent paths, and nondirectory targets report errors.
-- `jobs` lists active jobs as `[number]+ PID command`, or reports that none exist.
-- `exit` waits for all background processes and displays the three most recent
-  valid commands in chronological order. If only one or two valid commands exist,
-  it displays just the latest; if none exist, it says so. EOF performs the same cleanup.
+## Description of Group Meetings:
+Meeting 1: Divided labor
 
-History preserves the original input, including variable references and `&`.
-Successful built-ins and successfully started external commands count as valid;
-an external program's nonzero exit status does not invalidate its command.
-Blank input, syntax errors, failed built-ins, command lookup failures, and launch
-failures are excluded. `exit` itself is not added to history.
+Meeting 2: Worked on steps 1-6
 
-Standalone foreground built-ins run in the shell, including when redirected.
-Built-ins in pipelines or background jobs run in child processes, so their `cd`
-and `exit` affect only that child. Quotes, escapes, globs, and terminal job control
-are outside this project's scope.
+Meeting 3: Finished steps 4-6
+
+Meeting 4: Finished steps 7-9 + extra credit
+
+Meeting 5: Final code clean up and documentation
+
 
 ## Extra credit
 
 Piping and I/O redirection can be combined, including in the background:
+Piping combined with I/O redirection, including in the background is implemented.
+For example:
 
 ```text
+cat < input.txt | sort | uniq > output.txt
 cat < input.txt | sort | uniq > output.txt &
 ```
 
-Each stage applies its own redirections after connecting its pipe descriptors.
-Output files use permissions `-rw-------` and are overwritten rather than appended.
-
-## File listing
-
-- `src/main.c`: prompt/input loop, job polling, and history recording.
-- `src/lexer.c`, `include/lexer.h`: input reading and tokenization.
-- `src/prompt.c`, `include/prompt.h`: user, machine, and directory prompt.
-- `src/expand.c`, `include/expand.h`: environment-variable and tilde expansion.
-- `src/path.c`, `include/path.h`: executable lookup.
-- `src/redirect.c`, `include/redirect.h`: redirection parsing and descriptor setup.
-- `src/execute.c`, `include/execute.h`: pipeline parsing and process execution.
-- `src/jobs.c`, `include/jobs.h`: background process tracking and completion.
-- `src/builtins.c`, `include/builtins.h`: `cd`, `jobs`, `exit`, and history.
-- `include/shell.h`: shared shell state and command results.
-- `tests/test_shell.py`: integration tests for parts 7-9 and their interaction
-  with the existing command execution and redirection.
-- `Makefile`: build, test, dependency tracking, and clean targets.
+Each command in the pipeline connects its pipe descriptors first and then applies
+its own `<` or `>` redirection. The integration test
+`test_background_redirection_and_pipeline` covers this.

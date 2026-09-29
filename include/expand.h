@@ -3,7 +3,7 @@
 
 #include "lexer.h"
 
-// Replaces $VAR and ~ tokens in place with their expanded values.
+//Replaces $VAR and ~ tokens in place with their expanded values
 void expand_tokens(tokenlist *tokens);
 
 #endif
