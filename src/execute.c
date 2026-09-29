@@ -308,7 +308,8 @@ command_result execute_command(tokenlist *tokens, const char *line, shell_state 
 {
 	if (tokens == NULL || tokens->size == 0)
 		return COMMAND_ERROR;
-	command_stage stages[MAX_PIPELINE_COMMANDS] = {0};
+	command_stage stages[MAX_PIPELINE_COMMANDS];
+	memset(stages, 0, sizeof stages);
 	size_t count = 0;
 	int background = 0;
 	command_result result = COMMAND_ERROR;

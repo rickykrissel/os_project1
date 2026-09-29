@@ -1,4 +1,5 @@
 CC = gcc
+PYTHON ?= python3
 CFLAGS = -Wall -Wextra -std=c99 -g -Iinclude
 SRC = $(wildcard src/*.c)
 OBJ = $(SRC:src/%.c=obj/%.o)
@@ -15,7 +16,7 @@ obj/%.o: src/%.c
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 test: bin/shell
-	python3 tests/test_shell.py
+	$(PYTHON) tests/test_shell.py
 
 -include $(OBJ:.o=.d)
 

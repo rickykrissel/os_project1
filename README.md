@@ -9,7 +9,7 @@ make
 
 The executable is generated in `bin/`; generated binaries and object files are
 ignored by Git. `make clean` removes build output. `make test` runs the integration
-tests using Python 3's standard library; Python is not needed to build or run the shell.
+tests using Python 3.6+ and its standard library (override the interpreter with `make test PYTHON=...`); Python is not needed to build or run the shell.
 
 ## Supported commands
 
