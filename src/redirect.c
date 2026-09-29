@@ -107,7 +107,11 @@ int apply_redirection(const redirection *redir)
 			perror(redir->in_file);
 			return -1;
 		}
-		dup2(fd, STDIN_FILENO);
+		if (dup2(fd, STDIN_FILENO) < 0) {
+			perror("redirect: dup2");
+			close(fd);
+			return -1;
+		}
 		close(fd);
 	}
 
@@ -121,8 +125,11 @@ int apply_redirection(const redirection *redir)
 		}
 		/* O_CREAT's mode only applies to new files, so reset an
 		 * existing file's permissions to -rw------- as well. */
-		fchmod(fd, OUT_FILE_MODE);
-		dup2(fd, STDOUT_FILENO);
+		if (fchmod(fd, OUT_FILE_MODE) < 0 || dup2(fd, STDOUT_FILENO) < 0) {
+			perror("redirect");
+			close(fd);
+			return -1;
+		}
 		close(fd);
 	}
 

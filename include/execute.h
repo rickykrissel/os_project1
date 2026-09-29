@@ -1,17 +1,16 @@
 #ifndef EXECUTE_H
 #define EXECUTE_H
 
-#include "lexer.h"   /* for tokenlist */
+#include "lexer.h"
+#include "shell.h"
 
 /*
- * Runs an external command in the foreground (Part 5).
- *
- * tokens->items[0] is the command name; the whole NULL-terminated
- * items array is passed to execv() as the argument list.
- *
- * Returns 0 if the command was found and run (a "valid" command for
- * the exit history), or -1 if it was not found or could not be started.
+ * Executes up to three pipeline stages, optionally followed by &.
+ * Standalone foreground built-ins run in the shell process.
+ * COMMAND_OK means the command started successfully, even if an external
+ * program later returns nonzero. Syntax, lookup, and startup errors are invalid.
+ * tokens and the original command line remain owned by the caller.
  */
-int execute_external(tokenlist *tokens);
+command_result execute_command(tokenlist *tokens, const char *line, shell_state *shell);
 
 #endif
