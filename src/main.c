@@ -6,10 +6,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int main(void)
 {
-	shell_state shell = {0};
+	shell_state shell;
+	/* memset rather than {0}: older gcc (e.g. linprog) warns about missing braces. */
+	memset(&shell, 0, sizeof shell);
 	shell.jobs.next_number = 1;
 	/* Avoid reading future command lines into stdio's buffer before fork. */
 	setvbuf(stdin, NULL, _IONBF, 0);
