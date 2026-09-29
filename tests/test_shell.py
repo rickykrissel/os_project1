@@ -9,11 +9,18 @@ import time
 import unittest
 
 
-SHELL = Path(os.environ.get("SHELL_UNDER_TEST", "bin/shell")).resolve()
+# Resolve bin/shell from the repository root so the tests work from any directory.
+ROOT = Path(__file__).resolve().parent.parent
+SHELL = Path(os.environ.get("SHELL_UNDER_TEST", ROOT / "bin" / "shell")).resolve()
 PROMPT = re.compile(r"shelltest@shelltest:[^>\n]*>")
 
 
 class ShellTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not SHELL.is_file():
+            raise RuntimeError(f"{SHELL} not found; run `make` first")
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="shell-test-")
         self.addCleanup(self.temp.cleanup)
