@@ -26,7 +26,8 @@ class ShellTests(unittest.TestCase):
     def run_shell(self, commands, *, auto_exit=True):
         if auto_exit:
             commands += "\nexit\n"
-        result = subprocess.run([str(SHELL)], input=commands, text=True,
+        result = subprocess.run([str(SHELL)], input=commands,
+                                universal_newlines=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 cwd=self.directory, env=self.env, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
