@@ -112,6 +112,4 @@ cat < input.txt | sort | uniq > output.txt
 cat < input.txt | sort | uniq > output.txt &
 ```
 
-Each command in the pipeline connects its pipe descriptors first and then applies
-its own `<` or `>` redirection. The integration test
-`test_background_redirection_and_pipeline` covers this.
+Each command in the pipeline connects its pipe descriptors first and then applies its own < or > redirection. 
